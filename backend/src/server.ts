@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { app, server } from './app';
 import { InventoryAlerts } from './middleware/inventoryAlerts';
 import { prisma } from './lib/prisma';
@@ -19,45 +22,26 @@ process.on('SIGINT', () => {
 
 console.log('⚠️  Redis disabled - running without caching and queues');
 
-// Start inventory alerts scheduler only in production
-if (process.env.NODE_ENV === 'production') {
-  InventoryAlerts.startScheduledCheck();
+async function startServer() {
+  try {
+    // Test database connection
+    await prisma.$connect();
+    console.log('✅ Database connected successfully');
+
+    // Start inventory alerts
+    InventoryAlerts.startScheduledCheck();
+
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`🌍 Environment: ${process.env.NODE_ENV || 'not set'}`);
+      console.log(`📊 Health check: http://localhost:${PORT}/health`);
+      console.log(`📚 API Documentation: http://localhost:${PORT}/api-docs`);
+      console.log('⚡ Ready to handle requests!');
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
 }
 
-// Test Prisma connection and start server
-prisma.$connect().then(() => {
-  console.log('✅ Database connected successfully');
-  const dbConnected = true;
-  if (!dbConnected) {
-    console.warn('⚠️  Database connection failed, but starting server anyway...');
-    console.log('🔄 Server will retry database connections on demand');
-  }
-  
-  const httpServer = server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
-    console.log(`📊 Health check: http://localhost:${PORT}/health`);
-    console.log(`📚 API Documentation: http://localhost:${PORT}/api-docs`);
-    console.log(`⚡ Ready to handle requests!`);
-  });
-
-  // Graceful shutdown
-  process.on('SIGTERM', () => {
-    console.log('SIGTERM received, closing server...');
-    httpServer.close(() => {
-      console.log('Server closed');
-      process.exit(0);
-    });
-  });
-}).catch((error) => {
-  console.error('❌ Database connection failed:', error);
-  console.warn('⚠️  Starting server anyway...');
-  
-  const httpServer = server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
-    console.log(`📊 Health check: http://localhost:${PORT}/health`);
-    console.log(`📚 API Documentation: http://localhost:${PORT}/api-docs`);
-    console.log(`⚡ Ready to handle requests!`);
-  });
-});
+startServer();

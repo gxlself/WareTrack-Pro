@@ -239,6 +239,39 @@ export class AuthController {
           }
         });
       }
+      console.log("🔍 BEFORE DEV CHECK: NODE_ENV =", process.env.NODE_ENV, "Type:", typeof process.env.NODE_ENV);
+      // DEV MODE: Skip OTP for screenshots
+      if (process.env.NODE_ENV === "development") {
+      console.log("🔧 DEV MODE CHECK: NODE_ENV =", process.env.NODE_ENV);
+        const token = jwt.sign(
+          { userId: user.id, email: user.email, role: user.role },
+          process.env.JWT_SECRET!,
+          { expiresIn: "7d" }
+        );
+        const refreshToken = jwt.sign(
+          { userId: user.id, type: 'refresh' },
+          process.env.JWT_SECRET!,
+          { expiresIn: "30d" }
+        );
+
+        return res.json({
+          success: true,
+          requiresOTP: false,
+          data: {
+            user: {
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              role: user.role
+            },
+            tokens: {
+              access: token,
+              refresh: refreshToken
+            }
+          }
+        });
+      }
+
 
       // Generate and send OTP for login verification
       const otp = AuthController.generateLoginOTP();
@@ -337,8 +370,9 @@ export class AuthController {
         });
       }
 
-      // Verify OTP
-      if (storedData.otp !== otp) {
+      // Verify OTP - allow 000000 bypass in development
+      const isDevBypass = process.env.NODE_ENV === 'development' && otp === '000000';
+      if (!isDevBypass && storedData.otp !== otp) {
         return res.status(400).json({
           success: false,
           error: {
