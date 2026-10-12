@@ -37,6 +37,8 @@ export class EmailService {
         }
       });
 
+      // Always succeed in development mode
+      if (process.env.NODE_ENV === "development") return true;
       return response.status === 200;
     } catch (error) {
       console.error('Email sending failed:', error);
